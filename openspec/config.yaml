@@ -1,0 +1,59 @@
+schema: spec-driven
+
+context: |
+  ## 產品
+  哈魯（Anti-gravity）主題的日文學習平台。
+  目標用戶：準備 JLPT N5~N1 的日文學習者。
+
+  ## 技術規範（嚴格遵守）
+  - 前端：Vue 3 Composition API（SFC + <script setup> 語法）
+  - 後端：Node.js + Express
+  - 樣式：Tailwind CSS + Sass（_variables.scss 管理設計 token）
+  - 狀態管理：Pinia
+  - 路由：vue-router 4（lazy-loaded routes）
+  - HTTP：Axios（含 JWT interceptor）
+  - 物理效果：Web Animations API（核心）；Matter.js 僅用於歡迎頁，動態 import 懶加載
+  - ⚠️ 嚴禁使用 TypeScript，改用 JSDoc @typedef 提供類型提示
+
+  ## 核心功能模組
+  - 單字學習（VocabCard，含漂浮重力效果）
+  - 文法解說（GrammarPoint，含常見錯誤）
+  - 閱讀測驗（ArticleReader，含振假名）
+  - 錯題筆記系統（SRS 間隔重複記憶，SM-2 算法）
+  - 每日分級文章推薦（評分算法：主題匹配＋錯題關聯＋新鮮度）
+  - JLPT 全科模擬考（N5~N1）
+
+  ## JLPT 等級常數
+  levels: [N5, N4, N3, N2, N1]
+  N5: 入門（~800 詞）→ N1: 高級（~10,000 詞）
+
+  ## 設計風格
+  - 暗色主題：深空藍背景（#0a0e1a），極光紫藍主色（#6366f1），螢光青輔色（#22d3ee）
+  - 玻璃態卡片（Glassmorphism）
+  - 重力層（z-index 最底）：假名掉落 opacity < 0.15，永不遮蔽內容
+  - 動畫：核心學習區靜止；過渡/儀表板頁面有重力效果
+  - 必須支援 prefers-reduced-motion 降級
+
+  ## 命名慣例
+  - 文件：kebab-case（例：gravity-card.vue）
+  - 組件：PascalCase（例：VocabCard）
+  - Composable：use 前綴（例：useGravityEngine）
+  - API 路由：REST 風格，/api/v1/ 前綴
+  - CSS class：BEM + Tailwind 混用
+
+  ## 文件結構
+  openspec/system_architecture.md — Vue 組件樹 + Node.js 路由
+  openspec/api_definition.yaml   — OpenAPI 3.0 完整規範
+  openspec/gravity_physics_design.md — 物理系統設計
+  openspec/learning_logic.md     — SRS/推薦算法/DB Schema
+  openspec/style_strategy.md     — Tailwind + Sass 設計系統
+
+rules:
+  proposal:
+    - 明確說明功能對哪個 JLPT 等級有影響
+    - 列出 Non-goals 區段
+    - 說明是否涉及重力效果層（若是，標明效能影響評估）
+  tasks:
+    - 每個任務最多 2 小時工作量
+    - 涉及動畫的任務需加「[ ] 測試 prefers-reduced-motion 降級」子任務
+    - 後端任務需同時更新 api_definition.yaml

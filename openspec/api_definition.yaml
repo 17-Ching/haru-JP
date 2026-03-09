@@ -1,0 +1,722 @@
+openapi: "3.0.3"
+info:
+  title: 哈魯日文學習平台 API
+  version: "1.0.0"
+  description: |
+    Anti-gravity 主題日文學習平台後端 API。
+    支援使用者認證、單字/文法取得、測驗提交、筆記同步、文章推薦、模擬考試。
+  license:
+    name: MIT
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: 本地開發環境
+  - url: https://api.antigravity-jp.com/v1
+    description: 生產環境
+
+# ──────────────────────────────────────────────
+# 安全設定
+# ──────────────────────────────────────────────
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    # ── 通用 ──
+    Error:
+      type: object
+      properties:
+        code:    { type: integer }
+        message: { type: string }
+
+    Pagination:
+      type: object
+      properties:
+        total:    { type: integer }
+        page:     { type: integer }
+        pageSize: { type: integer }
+
+    JLPTLevel:
+      type: string
+      enum: [N5, N4, N3, N2, N1]
+
+    # ── 使用者 ──
+    User:
+      type: object
+      properties:
+        id:         { type: string, format: uuid }
+        username:   { type: string }
+        email:      { type: string, format: email }
+        level:      { $ref: '#/components/schemas/JLPTLevel' }
+        createdAt:  { type: string, format: date-time }
+        streak:     { type: integer, description: 連續學習天數 }
+
+    AuthTokens:
+      type: object
+      properties:
+        accessToken:  { type: string }
+        refreshToken: { type: string }
+        expiresIn:    { type: integer }
+
+    # ── 單字 ──
+    VocabItem:
+      type: object
+      properties:
+        id:       { type: string }
+        kanji:    { type: string, example: "重力" }
+        reading:  { type: string, example: "じゅうりょく" }
+        meaning:  { type: string, example: "gravity" }
+        level:    { $ref: '#/components/schemas/JLPTLevel' }
+        tags:     { type: array, items: { type: string } }
+        examples:
+          type: array
+          items:
+            type: object
+            properties:
+              sentence: { type: string }
+              reading:  { type: string }
+              translation: { type: string }
+        audioUrl: { type: string, format: uri }
+
+    # ── 文法 ──
+    GrammarPoint:
+      type: object
+      properties:
+        id:          { type: string }
+        pattern:     { type: string, example: "〜てみる" }
+        meaning:     { type: string }
+        level:       { $ref: '#/components/schemas/JLPTLevel' }
+        explanation: { type: string }
+        examples:
+          type: array
+          items:
+            type: object
+            properties:
+              sentence:    { type: string }
+              translation: { type: string }
+
+    # ── 測驗 ──
+    QuizQuestion:
+      type: object
+      properties:
+        id:       { type: string }
+        type:
+          type: string
+          enum: [multiple_choice, fill_blank, reading_comp]
+        prompt:   { type: string }
+        options:  { type: array, items: { type: string } }
+        audioUrl: { type: string, format: uri, nullable: true }
+        level:    { $ref: '#/components/schemas/JLPTLevel' }
+
+    QuizSubmission:
+      type: object
+      required: [quizId, answers]
+      properties:
+        quizId:
+          type: string
+        answers:
+          type: array
+          items:
+            type: object
+            properties:
+              questionId: { type: string }
+              answer:     { type: string }
+        timeTaken: { type: integer, description: 秒數 }
+
+    QuizResult:
+      type: object
+      properties:
+        quizId:    { type: string }
+        score:     { type: number, format: float }
+        total:     { type: integer }
+        correct:   { type: integer }
+        wrongItems:
+          type: array
+          items: { $ref: '#/components/schemas/VocabItem' }
+        nextReview: { type: string, format: date-time }
+
+    # ── 筆記（SRS）──
+    NoteEntry:
+      type: object
+      properties:
+        id:          { type: string }
+        userId:      { type: string }
+        contentType:
+          type: string
+          enum: [vocab, grammar, custom]
+        contentId:   { type: string, nullable: true }
+        text:        { type: string }
+        tags:        { type: array, items: { type: string } }
+        srsData:
+          type: object
+          properties:
+            interval:     { type: integer, description: 間隔天數 }
+            repetitions:  { type: integer }
+            easeFactor:   { type: number, format: float, description: SM-2 難度係數 }
+            nextReview:   { type: string, format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
+    # ── 文章 ──
+    Article:
+      type: object
+      properties:
+        id:         { type: string }
+        title:      { type: string }
+        content:    { type: string, description: 含振假名的 HTML }
+        level:      { $ref: '#/components/schemas/JLPTLevel' }
+        topic:      { type: string, example: "文化" }
+        wordCount:  { type: integer }
+        vocabLinks:
+          type: array
+          items:
+            type: object
+            properties:
+              word:    { type: string }
+              vocabId: { type: string }
+        publishedAt: { type: string, format: date-time }
+
+    # ── 模擬考 ──
+    MockExam:
+      type: object
+      properties:
+        id:         { type: string }
+        level:      { $ref: '#/components/schemas/JLPTLevel' }
+        sections:
+          type: array
+          items:
+            type: object
+            properties:
+              name:      { type: string, example: "言語知識（文字・語彙）" }
+              questions: { type: array, items: { $ref: '#/components/schemas/QuizQuestion' } }
+              timeLimit: { type: integer, description: 分鐘 }
+
+# ──────────────────────────────────────────────
+# API Paths
+# ──────────────────────────────────────────────
+paths:
+
+  # ── AUTH ──────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: 使用者註冊
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username: { type: string }
+                email:    { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                level:    { $ref: '#/components/schemas/JLPTLevel' }
+      responses:
+        '201':
+          description: 註冊成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:   { $ref: '#/components/schemas/User' }
+                  tokens: { $ref: '#/components/schemas/AuthTokens' }
+        '409': { description: Email 已存在 }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: 使用者登入
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:    { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: 登入成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user:   { $ref: '#/components/schemas/User' }
+                  tokens: { $ref: '#/components/schemas/AuthTokens' }
+        '401': { description: 帳密錯誤 }
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: 刷新 Access Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200':
+          description: 新 Token
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthTokens' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: 登出（撤銷 Refresh Token）
+      security: [{ BearerAuth: [] }]
+      responses:
+        '204': { description: 成功登出 }
+
+  # ── VOCAB ──────────────────────────────────────
+  /vocab:
+    get:
+      tags: [Vocabulary]
+      summary: 取得單字列表
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: level
+          in: query
+          schema: { $ref: '#/components/schemas/JLPTLevel' }
+        - name: tag
+          in: query
+          schema: { type: string }
+        - name: q
+          in: query
+          description: 關鍵字搜尋（kanji/reading/meaning）
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, default: 20, maximum: 100 }
+      responses:
+        '200':
+          description: 單字列表
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      items:
+                        type: array
+                        items: { $ref: '#/components/schemas/VocabItem' }
+
+  /vocab/{id}:
+    get:
+      tags: [Vocabulary]
+      summary: 取得單一單字詳情
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: 單字詳情
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/VocabItem' }
+        '404': { description: 找不到 }
+
+  # ── GRAMMAR ────────────────────────────────────
+  /grammar:
+    get:
+      tags: [Grammar]
+      summary: 取得文法點列表
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: level
+          in: query
+          schema: { $ref: '#/components/schemas/JLPTLevel' }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+      responses:
+        '200':
+          description: 文法列表
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/GrammarPoint' }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
+
+  /grammar/{id}:
+    get:
+      tags: [Grammar]
+      summary: 取得單一文法詳情
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/GrammarPoint' }
+
+  # ── QUIZ ────────────────────────────────────────
+  /quiz/generate:
+    get:
+      tags: [Quiz]
+      summary: 動態生成測驗題組
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: level
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/JLPTLevel' }
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [vocab, grammar, reading, mixed]
+            default: mixed
+        - name: count
+          in: query
+          schema: { type: integer, default: 10, maximum: 50 }
+        - name: includeWrong
+          in: query
+          description: 是否優先納入錯題
+          schema: { type: boolean, default: true }
+      responses:
+        '200':
+          description: 題組
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  quizId:    { type: string }
+                  questions: { type: array, items: { $ref: '#/components/schemas/QuizQuestion' } }
+                  expiresAt: { type: string, format: date-time }
+
+  /quiz/submit:
+    post:
+      tags: [Quiz]
+      summary: 提交測驗答案
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/QuizSubmission' }
+      responses:
+        '200':
+          description: 測驗結果（含錯題與下次複習時間）
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QuizResult' }
+
+  # ── NOTES ───────────────────────────────────────
+  /notes:
+    get:
+      tags: [Notes]
+      summary: 取得使用者所有筆記
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [vocab, grammar, custom]
+        - name: dueForReview
+          in: query
+          description: 只回傳今日待複習
+          schema: { type: boolean }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: '#/components/schemas/NoteEntry' } }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
+
+    post:
+      tags: [Notes]
+      summary: 新增筆記
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contentType, text]
+              properties:
+                contentType: { type: string, enum: [vocab, grammar, custom] }
+                contentId:   { type: string }
+                text:        { type: string }
+                tags:        { type: array, items: { type: string } }
+      responses:
+        '201':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NoteEntry' }
+
+  /notes/sync:
+    post:
+      tags: [Notes]
+      summary: 批次同步筆記（離線後上傳）
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notes:
+                  type: array
+                  items: { $ref: '#/components/schemas/NoteEntry' }
+                lastSyncAt: { type: string, format: date-time }
+      responses:
+        '200':
+          description: 回傳衝突解決結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  merged:    { type: integer }
+                  conflicts: { type: array, items: { type: object } }
+
+  /notes/review:
+    post:
+      tags: [Notes]
+      summary: 提交單條筆記的 SRS 複習回饋
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [noteId, quality]
+              properties:
+                noteId:  { type: string }
+                quality:
+                  type: integer
+                  minimum: 0
+                  maximum: 5
+                  description: SM-2 評分（0=完全忘記, 5=完美記得）
+      responses:
+        '200':
+          description: 更新後的 SRS 資料
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nextReview: { type: string, format: date-time }
+                  interval:   { type: integer }
+                  easeFactor: { type: number }
+
+  /notes/{id}:
+    put:
+      tags: [Notes]
+      summary: 更新筆記
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                text: { type: string }
+                tags: { type: array, items: { type: string } }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/NoteEntry' }
+    delete:
+      tags: [Notes]
+      summary: 刪除筆記
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '204': { description: 已刪除 }
+
+  # ── ARTICLES ────────────────────────────────────
+  /articles/daily:
+    get:
+      tags: [Articles]
+      summary: 取得今日推薦文章
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  articles:
+                    type: array
+                    items: { $ref: '#/components/schemas/Article' }
+                    maxItems: 3
+
+  /articles:
+    get:
+      tags: [Articles]
+      summary: 文章列表（依級別/主題過濾）
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: level
+          in: query
+          schema: { $ref: '#/components/schemas/JLPTLevel' }
+        - name: topic
+          in: query
+          schema: { type: string }
+        - name: page
+          in: query
+          schema: { type: integer, default: 1 }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:      { type: array, items: { $ref: '#/components/schemas/Article' } }
+                  pagination: { $ref: '#/components/schemas/Pagination' }
+
+  /articles/{id}:
+    get:
+      tags: [Articles]
+      summary: 取得文章詳情
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Article' }
+
+  # ── RECOMMEND ───────────────────────────────────
+  /recommend/{userId}:
+    get:
+      tags: [Recommend]
+      summary: 取得個人化學習推薦（單字 + 文章）
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  vocabs:    { type: array, items: { $ref: '#/components/schemas/VocabItem' } }
+                  articles:  { type: array, items: { $ref: '#/components/schemas/Article' } }
+                  reviewDue: { type: integer, description: 今日待複習題數 }
+
+  # ── MOCK EXAM ───────────────────────────────────
+  /exam/mock:
+    get:
+      tags: [Exam]
+      summary: 取得模擬考（依 JLPT 等級）
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - name: level
+          in: query
+          required: true
+          schema: { $ref: '#/components/schemas/JLPTLevel' }
+      responses:
+        '200':
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/MockExam' }
+
+  /exam/submit:
+    post:
+      tags: [Exam]
+      summary: 提交模擬考答案
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [examId, sections]
+              properties:
+                examId: { type: string }
+                sections:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      sectionName: { type: string }
+                      answers:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            questionId: { type: string }
+                            answer:     { type: string }
+                timeTaken: { type: integer, description: 總秒數 }
+      responses:
+        '200':
+          description: 模擬考結果
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  examId:   { type: string }
+                  totalScore: { type: number }
+                  passed:   { type: boolean }
+                  sections:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        name:    { type: string }
+                        score:   { type: number }
+                        correct: { type: integer }
+                        total:   { type: integer }
+                  wrongItems: { type: array, items: { $ref: '#/components/schemas/QuizQuestion' } }

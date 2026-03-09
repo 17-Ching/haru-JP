@@ -1,0 +1,167 @@
+// ══════════════════════════════════════════════════════
+//  src/assets/styles/main.scss — 全局樣式入口
+//  Note: _variables.scss 已由 Vite additionalData 自動注入
+//  無需在此重複 @import，Tailwind 指令緊接在最前
+// ══════════════════════════════════════════════════════
+
+// 1. Tailwind 基礎
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+// 2. 全局 Reset / Base
+@layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background-color: $color-bg-base;
+    color: $color-text-primary;
+    font-family: 'Inter', 'Noto Sans JP', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  // 日文文字優化
+  :lang(ja) { font-family: 'Noto Sans JP', sans-serif; line-height: 1.8; }
+
+  // 振假名（ruby）樣式
+  ruby { ruby-align: center; }
+  rt   { font-size: 0.6em; color: $color-accent-400; opacity: 0.8; }
+
+  // 自定義滾動條
+  ::-webkit-scrollbar       { width: 6px; }
+  ::-webkit-scrollbar-track { background: $color-bg-surface; }
+  ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.4); border-radius: 3px; }
+}
+
+// 3. 全局元件層
+@layer components {
+
+  // ── 玻璃態卡片 ─────────────────────────────────────
+  .glass-card {
+    position: relative;
+    background: rgba(31, 41, 55, 0.55);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border: 1px solid rgba(99, 102, 241, 0.12);
+    border-radius: $radius-lg;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 0 1px rgba(99,102,241,0.06);
+    transition: box-shadow 0.3s $ease-smooth, transform 0.3s $ease-smooth;
+    overflow: hidden;
+
+    // 頂部光澤線
+    &::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      background: linear-gradient(135deg, rgba(255,255,255,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    &:hover {
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 0 16px rgba(99,102,241,0.15);
+      transform: translateY(-2px);
+    }
+  }
+
+  // ── JLPT 等級徽章 ───────────────────────────────────
+  .level-badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold tracking-wide uppercase;
+    &--N5 { background: rgba(74,222,128,0.15);  color: #4ade80; border: 1px solid rgba(74,222,128,0.3); }
+    &--N4 { background: rgba(34,211,238,0.15);  color: #22d3ee; border: 1px solid rgba(34,211,238,0.3); }
+    &--N3 { background: rgba(129,140,248,0.15); color: #818cf8; border: 1px solid rgba(129,140,248,0.3); }
+    &--N2 { background: rgba(251,191,36,0.15);  color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+    &--N1 { background: rgba(248,113,113,0.15); color: #f87171; border: 1px solid rgba(248,113,113,0.3); }
+  }
+
+  // ── 主按鈕 ──────────────────────────────────────────
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-semibold text-sm;
+    background: linear-gradient(135deg, $color-primary-500, $color-primary-600);
+    color: #fff;
+    transition: all 0.2s $ease-smooth;
+    box-shadow: 0 2px 12px rgba(99,102,241,0.3);
+
+    &:hover:not(:disabled) {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 20px rgba(99,102,241,0.5);
+    }
+    &:active { transform: translateY(0); }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl font-medium text-sm;
+    color: $color-text-primary;
+    border: 1px solid rgba(255,255,255,0.08);
+    transition: all 0.2s $ease-smooth;
+    &:hover { background: rgba(255,255,255,0.05); border-color: rgba(99,102,241,0.3); }
+  }
+
+  // ── 選項按鈕（測驗用）──────────────────────────────
+  .option-btn {
+    @apply w-full text-left px-4 py-3 rounded-xl text-sm font-medium;
+    background: rgba(31,41,55,0.6);
+    border: 1px solid rgba(255,255,255,0.06);
+    color: $color-text-primary;
+    transition: all 0.2s $ease-smooth;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+      background: rgba(99,102,241,0.12);
+      border-color: rgba(99,102,241,0.4);
+    }
+    &--correct {
+      background: rgba(74,222,128,0.12) !important;
+      border-color: rgba(74,222,128,0.5) !important;
+      color: #4ade80 !important;
+    }
+    &--wrong {
+      background: rgba(248,113,113,0.12) !important;
+      border-color: rgba(248,113,113,0.5) !important;
+      color: #f87171 !important;
+    }
+  }
+}
+
+// 4. 重力層 ─────────────────────────────────────────────
+.gravity-layer {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  user-select: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.falling-kana {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  will-change: transform, opacity;
+  color: $gravity-kana-color;
+  font-family: 'Noto Sans JP', sans-serif;
+}
+
+// 5. 動畫工具 ───────────────────────────────────────────
+.animate-float { animation: floatUpDown 3s ease-in-out infinite; }
+
+@keyframes floatUpDown {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-8px); }
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in-up { animation: fadeInUp 0.4s $ease-smooth both; }
+
+// 尊重 prefers-reduced-motion
+@media (prefers-reduced-motion: reduce) {
+  .falling-kana, .animate-float, .fade-in-up { animation: none !important; }
+  .glass-card:hover { transform: none; }
+}
