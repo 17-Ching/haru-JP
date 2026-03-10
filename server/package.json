@@ -4,6 +4,9 @@
   "type": "module",
   "description": "哈魯日文學習平台 API Server",
   "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js"
