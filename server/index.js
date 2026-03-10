@@ -15,6 +15,9 @@ const require = createRequire(import.meta.url);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Railway / Vercel 等平台都有 reverse proxy，需信任一層
+app.set("trust proxy", 1);
+
 // ── Middleware ──────────────────────────────────────────
 const allowedOrigins = (
   process.env.ALLOWED_ORIGINS || "http://localhost:5173"
